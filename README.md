@@ -50,9 +50,7 @@ julia> A.f(A.Foo())
 This is Foo.
 ```
 
-But suppose we want unqualified use of '`f`' to refer to the correct object `f` --- either `f`, `A.f` or `B.f` --- depending on the signature of the argument on which `f` is called. One option is to import '`f`' into module `B` and, in `B`, extend the function `f` that lives in module `A`. There are variants of this strategy, such as importing '`f`' from both `A` and `B` into a new module `SuperSecretBase`).
-
-The present "package" provides a different option, namely "merging" the methods of `A.f` and `B.f` into our original function `f` as defined in `Main`. This allows unqualified use of the name '`f`' to dispatch on signatures for which methods are defined in other modules:
+But suppose we want unqualified use of '`f`' to refer to the correct object `f` --- either `f`, `A.f` or `B.f` --- depending on the signature of the argument on which `f` is called. The present "package" offers this functionality through the `metamerge()` function, which "merges" the methods of `A.f` and `B.f` into our original function `f` as defined in `Main`. (At its core, this is just extending the `f` defined in `Main`.) This allows unqualified use of the name '`f`' to dispatch on signatures for which methods are defined in other modules:
 
 ```
 julia> metamerge(f, A, B)
