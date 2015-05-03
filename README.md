@@ -52,7 +52,7 @@ This is Foo.
 
 But suppose we want unqualified use of '`f`' to refer to the correct object `f` --- either `f`, `A.f` or `B.f` --- depending on the signature of the argument on which `f` is called. One option is to import '`f`' into module `B` and, in `B`, extend the function `f` that lives in module `A`. There are variants of this strategy, such as importing '`f`' from both `A` and `B` into a new module `SuperSecretBase`).
 
-The present "package" provides a different option, namely "merging" the methods of `A.f` and `B.f` into a new function that can be referred to by unqualified use of the name '`f`':
+The present "package" provides a different option, namely "merging" the methods of `A.f` and `B.f` into our original function `f` as defined in `Main`. This allows unqualified use of the name '`f`' to dispatch on signatures for which methods are defined in other modules:
 
 ```
 julia> metamerge(f, A, B)
@@ -65,7 +65,6 @@ This is Bar.
 ```
 
 Note that no method for the signature `(x::Int64,)` was merged since both `A.f` and `B.f` have methods for this signature. To choose one to merge, use the optional `conflicts_favor` keyword argument:
-
 ```
 julia> metamerge(f, A, B, conflicts_favor=A)
 f (generic function with 4 methods)
@@ -73,6 +72,8 @@ f (generic function with 4 methods)
 julia> f(2)
 2
 ```
+If the `conflicts_favor` argument is omitted, then only those methods whose signatures unambiguously specify precisely one of `A.f` or `B.f` will be merged.
+
 
 IMPORTANT: The name '`f`' must refer to a function that lives in the module in which `metamerge()` is called:
 
@@ -91,4 +92,4 @@ makemethod                    Function
 metamerge                     Function
 ```
 
-Thus, at least in Julia 3.7, one must define a function named '`f`' *before* `using` the modules `A` and `B`. Right now this can be inconvenient. However, I expect this situation will change in Julia 4.0, in which (as I understand it) new rules for importing conflicting names from different modules are adopted. 
+Otherwise, `metamerge(f, A, B)` will try to extend an `f` that lives in either `A` or `B` (depending on the order in which they were declared to be used). In general, this will fail. Thus, at least in Julia 3.7, one must define a function named '`f`' *before* `using` the modules `A` and `B`. Right now this can be inconvenient. However, I expect this situation will change in Julia 4.0, in which (as I understand it) new rules for importing conflicting names from different modules are adopted. 
