@@ -71,6 +71,7 @@ function metamerge(f::Function, module_A::Module, module_B::Module; conflicts_fa
     end
 
     # Loop through elements of fB_sigs and assign appropriate methods of B.f to f
+    for (i, sig) in enumerate(fB_sigs)
         # println(sig)
         makemethod(f, sig, symbol("$module_B"))
     end
