@@ -1,5 +1,7 @@
 module MetaMerge
 
+importall Main
+
 export metamerge
 
 function makemethod(f::Function, argtypes::Tuple, modulename::Symbol)
@@ -7,16 +9,17 @@ function makemethod(f::Function, argtypes::Tuple, modulename::Symbol)
     # Note that passing a value such as 'A.f' to makemethod() will drop the module
     # from the function name. We must therefore add it to the expression passed to
     # RHS (below):
-    expr_Mf = Expr(:., modulename, QuoteNode(symbol("$f")))
+    expr_Modulef = Expr(:., Expr(:., symbol("Main"), QuoteNode(modulename)), QuoteNode(symbol("$f")))
+    expr_Mainf = Expr (:., symbol("Main"), QuoteNode(symbol("$f")))
 
-    # Expression calling 'newf'
-    LHS = Expr(:call, symbol("$f"))
+    # Expression calling 'Main.f'
+    LHS = Expr(:call, expr_Mainf)
 
-    # Expression calling 'oldf' with proper module prefix
-    RHS = Expr(:call, expr_Mf)
+    # Expression calling 'Main.Module.f'
+    RHS = Expr(:call, expr_Modulef)
 
-    # Adds argument symbols with type annotations to signature of call to 'newf'
-    # Adds just argument symbols to call of 'oldf'
+    # Adds argument symbols with type annotations to signature of call to 'Main.f'
+    # Adds just argument symbols to call of 'Main.Module.f'
     for (i, arg) in enumerate(argtypes)
         push!(LHS.args, Expr(:(::), symbol("x$i"), arg))
         push!(RHS.args, symbol("x$i"))
@@ -26,14 +29,14 @@ function makemethod(f::Function, argtypes::Tuple, modulename::Symbol)
 
     # Sets the calls of 'newf' and 'oldf' equal to one another and evaluates.
     exeq = Expr(:(=), LHS, RHS)
-    @eval($exeq)
+    eval(exeq)
 end
 
 function metamerge(f::Function, module_A::Module, module_B::Module; conflicts_favor=Module)
 
     # Generate symbols for $module_A.$f, $module_B.$f
-    expr_fA = Expr(:., symbol("$module_A"), QuoteNode(symbol("$f")))
-    expr_fB = Expr(:., symbol("$module_B"), QuoteNode(symbol("$f")))
+    expr_fA = Expr(:., Expr(:., symbol("Main"), QuoteNode(symbol("$module_A"))), QuoteNode(symbol("$f")))
+    expr_fB = Expr(:., Expr(:., symbol("Main"), QuoteNode(symbol("$module_B"))), QuoteNode(symbol("$f")))
 
     # Generate calls to functions $module_A.$f, $module_B.$f
     expr_fAcall = Expr(:call, expr_fA)
@@ -55,9 +58,9 @@ function metamerge(f::Function, module_A::Module, module_B::Module; conflicts_fa
     # of ambiguous signatures to be handled by A.f or B.f. If 'conflicts_favor'
     # is void or equal to neither A nor B, then no method is assigned for the
     # ambiguous signature.
-    if conflicts_favor == A
+    if conflicts_favor == module_A
         fB_sigs = setdiff(fB_sigs, AB_intr)
-    elseif conflicts_favor == B
+    elseif conflicts_favor == module_B
         fA_sigs = setdiff(fA_sigs, AB_intr)
     else
         fB_sigs = setdiff(fB_sigs, AB_intr)
@@ -108,8 +111,10 @@ function metamerge(module_A::Module, module_B::Module; conflicts_favor=Module)
     # Merge functions in functions_intr
     for (i, f) in enumerate(functions_intr)
         metamerge(f, module_A, module_B, conflicts_favor=@eval($conflicts_favor))
-        println("Merged function $f with methods from $module_A, $module_B.")
+        # println("Merged function $f with methods from $module_A, $module_B.")
     end
+
+    return functions_intr
 
 end # Function metamerge(module_A::Module, module_B::Module; conflicts_favor=Module)
 
