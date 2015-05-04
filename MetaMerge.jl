@@ -94,4 +94,4 @@ function merge!(fmerged::Function, modfuncA::(Module, Function), modfuncB::(Modu
 
 end # Function merge!(fmerged::Function, modfuncA::(Module, Function), modfuncB::(Module, Function); conflicts_favor=Module)
 
-end # Module MergeMethods
+end # Module MetaMerge
