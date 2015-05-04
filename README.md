@@ -32,7 +32,7 @@ g(::Bar) = print("This is also Bar")
 end
 ```
 
-As of Julia 3.7, unqualified use of a name common to both modules -- say, the name '`f`' -- will elicit behavior that depends on the order in which we declare to be `using` the modules:
+As of Julia 0.3.7, unqualified use of a name common to both modules -- say, the name '`f`' -- will elicit behavior that depends on the order in which we declare to be `using` the modules:
 
 ```
 julia> using A, B
@@ -90,4 +90,4 @@ makemethod                    Function
 metamerge                     Function
 ```
 
-Otherwise, `metamerge(f, A, B)` will try to extend an `f` that lives in either `A` or `B` (depending on the order in which they were declared to be used). In general, this will fail. Thus, at least in Julia 3.7, one must define a function named '`f`' *before* `using` the modules `A` and `B`. Right now this can be inconvenient. However, I expect this situation will change in Julia 4.0, in which (as I understand it) new rules for importing conflicting names from different modules are adopted. 
+Otherwise, `metamerge(f, A, B)` will try to extend an `f` that lives in either `A` or `B` (depending on the order in which they were declared to be used). In general, this will fail. Thus, at least in Julia 0.3.7, one must define a function named '`f`' *before* `using` the modules `A` and `B`. Right now this can be inconvenient. However, I expect this situation will change in Julia 0.4.0, in which (as I understand it) new rules for importing conflicting names from different modules are adopted. 
