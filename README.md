@@ -152,10 +152,7 @@ julia> q(A.Foo())
 This is Foo.
 ```
 
-<<<<<<< HEAD
-=======
 ## To do:
 
 1. Currently, `merge!()` only handles two `(Module, Function)` tuples in its argument. In the future, one should be able to call `merge!()` on any number of such arguments, e.g. `merge!(f, (A,f))` or `merge!(f, (A,f), (B,f), (C,f))`.
 2. Currently, if one wants to merge multiple functions from two+ modules, one has to `merge!()` each set of names individually. In the future, there should be a `mergeall()` function that automatically merges all commonly named functions between two modules, e.g. `mergeall(A, B, conflicts_favor=A)` generates a list of function names common to `A` and `B` and `merge!`s them.
->>>>>>> c0371b283fb6726a5948766a27cbc14ba1e6d58b
