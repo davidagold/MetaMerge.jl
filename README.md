@@ -1,8 +1,8 @@
 # MetaMerge.jl
 
-This package is not currently registered, but you can clone it for yourself with
+This package is not currently registered, but you can use the REPL to clone it for yourself with
 ```
-julia> Pkg.clone("git://github.com/davidagold/MetaMerge.jl.git)
+julia> Pkg.clone("git://github.com/davidagold/MetaMerge.jl.git")
 ```
 ### What's new (as of v0.3)
 1. Changed 'merge!()' to 'fmerge!()' in order to avoid potential name conflicts with base (wouldn't that be ironic?). I don't plan on doing this ever again.
