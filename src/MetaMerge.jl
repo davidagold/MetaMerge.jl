@@ -4,7 +4,7 @@ importall Main
 
 export merge!
 
-function makemethod(expr_fmerged, expr_fmodule::Expr, argtypes::Tuple)
+function makemethod(expr_fmerged::Expr, expr_fmodule::Expr, argtypes::Tuple, source::Symbol)
 
     # Expression calling fmerged
     LHS = Expr(:call, expr_fmerged)
@@ -12,24 +12,59 @@ function makemethod(expr_fmerged, expr_fmodule::Expr, argtypes::Tuple)
     # Expression calling function denoted by expr_fmodule
     RHS = Expr(:call, expr_fmodule)
 
-    # Adds argument symbols with type annotations to signature of call to 'fmerged'
-    # Adds just argument symbols to call of 'fmodule'
+    # Add argument symbols with type annotations to signature of call to 'fmerged'
+    # Add just argument symbols to call of 'fmodule'
     for (i, arg) in enumerate(argtypes)
-        push!(LHS.args, Expr(:(::), symbol("x$i"), arg))
-        push!(RHS.args, symbol("x$i"))
+        # Include the name of the module from which the method is derived in the name of the first argument
+        if i == 1
+            push!(LHS.args, Expr(:(::), symbol("x$i\_$source"), arg))
+            push!(RHS.args, symbol("x$i\_$source"))
+        else
+            push!(LHS.args, Expr(:(::), symbol("x$i"), arg))
+            push!(RHS.args, symbol("x$i"))
+        end
     end
-    # println(LHS)
-    # println(RHS)
 
     # Set the calls of 'newf' and 'oldf' equal to one another and evaluates.
     ex_eq = Expr(:(=), LHS, RHS)
 
     # Generate method
-    # println(ex_eq)
     eval(ex_eq)
 end
 
-function merge!(fmerged::Function, modfuncA::(Module, Function), modfuncB::(Module, Function); conflicts_favor=Module)
+function fexpress(modufunc::(Module, Function))
+
+    # Generate symbol for modu (hereafter "module" in comments)
+    symb_module = symbol("$(modufunc[1])")
+
+    # Generate symbol for func (hereafter "f" in comments)
+    symb_f = symbol("$(modufunc[2])")
+
+    # Generate expressions for Main.module
+    expr_main = Expr(:., symbol("Main"), QuoteNode(symb_module))
+
+    # Generate expressions for Main.module.f
+    expr_f = Expr(:., expr_main, QuoteNode(symb_f))
+
+    return expr_f
+
+end
+
+
+function getsigs(modufunc::(Module, Function))
+
+    # Generate an array of Method objects respective to Main.module.f
+    const fmethods = methods(eval(fexpress(modufunc)), (Any...))
+
+    # Generate arrays of method signatures respective to each method of Main.module.f in fmethods.
+    # Note that the 'sig' field of a Method is (as of 3.7) a tuple of types.
+    const fsigs = [ fmethods[i].sig for i in 1:length(fmethods) ]
+
+    return fsigs
+
+end
+
+function merge!(fmerged::Function, modufuncs::(Module, Function)...; priority=[])
 
     # Generate symbol for module calling mergemethods()
     # Hereafter the calling module will be known as 'here'.
@@ -39,57 +74,41 @@ function merge!(fmerged::Function, modfuncA::(Module, Function), modfuncB::(Modu
     expr_here = Expr(:., symbol("Main"), QuoteNode(symb_here))
     expr_fmerged = Expr(:., expr_here, QuoteNode(symbol("$fmerged")))
 
-    # Generate symbols for fA, fB
-    symb_moduleA = symbol("$(modfuncA[1])")
-    symb_moduleB = symbol("$(modfuncB[1])")
-
-    # Generate symbols for moduleA, moduleB
-    fA = symbol("$(modfuncA[2])")
-    fB = symbol("$(modfuncB[2])")
-
-    # Generate expressions for Main.moduleA, Main.moduleB
-    expr_MainA = Expr(:., symbol("Main"), QuoteNode(symb_moduleA))
-    expr_MainB = Expr(:., symbol("Main"), QuoteNode(symb_moduleB))
-
-    # Generate expressions for Main.ModuleA.fA, Main.ModuleB.fB
-    expr_fA = Expr(:., expr_MainA, QuoteNode(fA))
-    expr_fB = Expr(:., expr_MainB, QuoteNode(fB))
-
-    # Generate arrays of Method objects for Main.ModuleA.fA, Main.ModuleB.fB
-    const methods_fA = methods(eval(expr_fA), (Any...))
-    const methods_fB = methods(eval(expr_fB), (Any...))
-
-    # Generate arrays of method signatures for Main.ModuleA.fA, Main.ModuleB.fB
-    # Note that the 'sig' field of a Method is (as of 3.7) a tuple of types.
-    const sigs_fA = [ methods_fA[i].sig for i in 1:length(methods_fA) ]
-    const sigs_fB = [ methods_fB[i].sig for i in 1:length(methods_fB) ]
-
-    # Generate array of overlapping signatures of A.f, B.f, i.e. ambiguous cases.
-    const conflicts = intersect(sigs_fA, sigs_fB)
-
-    # Adjust either sigs_fA or sigs_fB according to whether caller wishes cases
-    # of ambiguous signatures to be handled by A.f or B.f. If 'conflicts_favor'
-    # is void or equal to neither A nor B, then no method is assigned for the
-    # ambiguous signature.
-    if conflicts_favor == eval(expr_MainA)
-        sigs_fB = setdiff(sigs_fB, conflicts)
-    elseif conflicts_favor == eval(expr_MainB)
-        sigs_fA = setdiff(sigs_fA, conflicts)
-    else
-        sigs_fB = setdiff(sigs_fB, conflicts)
-        sigs_fA = setdiff(sigs_fA, conflicts)
+    # Create a dictionary of ranks
+    ranks = [ priority[i] => i for i in 1:length(priority) ]
+    for mfpair in setdiff(modufuncs, priority)
+        ranks[mfpair] = length(modufuncs)
     end
 
-    # Loop through elements of sigs_fA and assign appropriate methods of A.f to h
-    for (i, sig) in enumerate(sigs_fA)
-        # println(sig)
-        makemethod(expr_fmerged, expr_fA, sig)
-    end
+    # Create a dictionary of signatures where each key is a (module, function) and the value is the array of signatures the function
+    const sigregister = [ (modufuncs[i])=>getsigs(modufuncs[i]) for i in 1:length(modufuncs) ]
 
-    # Loop through elements of sigs_fB and assign appropriate methods of B.f to h
-    for (i, sig) in enumerate(sigs_fB)
-        # println(sig)
-        makemethod(expr_fmerged, expr_fB, sig)
+    # In the following loop, each "mfpair" variable is a (Module, Function) 2-tuple. We will refer to the Module by "module" and the Function by "f"
+    for mfpair in modufuncs
+
+        fsigs = sigregister[(mfpair)]
+
+        for sig in fsigs
+            currentrank = ranks[mfpair]
+            bestrank = length(modufuncs) + 1
+
+            # Loops through (Module, Function) pairs other than current pair and checks for matching signatures. If there is a match, then 'bestrank' is compared to the rank of the (M,F) pair of the matching signature and replaced is the latter rank is better (i.e. less than 'bestrank').
+            for mfpair2 in setdiff(modufuncs, [mfpair])
+                matches = find(x -> string(x)=="$sig", sigregister[mfpair2])
+                if isempty(matches)
+                    nothing
+                else
+                    for match in matches
+                        ranks[mfpair2] < bestrank && (bestrank = ranks[mfpair2])
+                    end
+                end
+            end
+
+            # A method is made for the current signature only if the rank its source (M,F) pair is best. Note that in the case of tied ranks, no method is made. Tied ranks can occur only if both (M,F) pairs have rank length(modufuncs), i.e. only if the user does not explicitly include them in the 'priority' argument.
+            currentrank < bestrank && makemethod(expr_fmerged, fexpress(mfpair), sig, symbol("$(mfpair[1])"))
+
+        end
+
     end
 
 end # Function merge!(fmerged::Function, modfuncA::(Module, Function), modfuncB::(Module, Function); conflicts_favor=Module)
