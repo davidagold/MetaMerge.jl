@@ -1,10 +1,9 @@
-# Is it this one???
 
 module MetaMerge
 
 importall Main
 
-export merge!
+export fmerge!
 
 function makemethod(expr_fmerged::Expr, expr_fmodule::Expr, argtypes::Tuple, source::Symbol)
 
@@ -66,7 +65,9 @@ function getsigs(modufunc::(Module, Function))
 
 end
 
-function merge!(fmerged::Function, modufuncs::(Module, Function)...; priority=[])
+
+function fmerge!(fmerged::Function, modufuncs::(Module, Function)...; priority=[])
+    # 'modufuncs' is an array of (Module, Function) tuples. Hereafter in the comments we will refer to such tuples individually as (m,f), e.g. "for (m,f) in modufunc"
 
     # Generate symbol for module calling mergemethods()
     # Hereafter the calling module will be known as 'here'.
@@ -76,25 +77,29 @@ function merge!(fmerged::Function, modufuncs::(Module, Function)...; priority=[]
     expr_here = Expr(:., symbol("Main"), QuoteNode(symb_here))
     expr_fmerged = Expr(:., expr_here, QuoteNode(symbol("$fmerged")))
 
-    # Create a dictionary of ranks
-    ranks = [ priority[i] => i for i in 1:length(priority) ]
+    # Create a dictionary of priority ranks, initialize with ranks specified by user in 'priority' keyword argument
+    ranks = ((Module,Function)=>Int64)[ priority[i] => i for i in 1:length(priority) ]
+
+    # Add keys for (m, f) pairs not specified in 'priority', assign each such key the value length(modufuncs), i.e. make them all equally ranked last.
     for mfpair in setdiff(modufuncs, priority)
         ranks[mfpair] = length(modufuncs)
     end
 
-    # Create a dictionary of signatures where each key is a (module, function) and the value is the array of signatures the function
+    # Create a dictionary of signatures where each key is an (m,f) from 'modufuncs' and the value is the array of signatures the function
     const sigregister = [ (modufuncs[i])=>getsigs(modufuncs[i]) for i in 1:length(modufuncs) ]
 
-    # In the following loop, each "mfpair" variable is a (Module, Function) 2-tuple. We will refer to the Module by "module" and the Function by "f"
+    # In the following loop, each 'mfpair' variable is an (m,f) pair
     for mfpair in modufuncs
 
         fsigs = sigregister[(mfpair)]
 
+        # Each 'sig' is a tuple of datatypes (in Julia 0.3.7)
         for sig in fsigs
             currentrank = ranks[mfpair]
+            # Initialize 'bestrank' as impossibly low rank
             bestrank = length(modufuncs) + 1
 
-            # Loops through (Module, Function) pairs other than current pair and checks for matching signatures. If there is a match, then 'bestrank' is compared to the rank of the (M,F) pair of the matching signature and replaced is the latter rank is better (i.e. less than 'bestrank').
+            # Loops through (m,f) pairs other than current pair and checks for matching signatures. If there is a match, then 'bestrank' is compared to the rank of the (m,f) pair of the matching signature and replaced is the latter rank is better (i.e. less than 'bestrank').
             for mfpair2 in setdiff(modufuncs, [mfpair])
                 matches = find(x -> string(x)=="$sig", sigregister[mfpair2])
                 if isempty(matches)
@@ -106,13 +111,13 @@ function merge!(fmerged::Function, modufuncs::(Module, Function)...; priority=[]
                 end
             end
 
-            # A method is made for the current signature only if the rank its source (M,F) pair is best. Note that in the case of tied ranks, no method is made. Tied ranks can occur only if both (M,F) pairs have rank length(modufuncs), i.e. only if the user does not explicitly include them in the 'priority' argument.
+            # A method is made for the current signature only if the rank its source (m,f) pair is best. Note that in the case of tied ranks, no method is made. Tied ranks can occur only if both (m,f) pairs have rank length(modufuncs), i.e. only if the user does not explicitly include them in the 'priority' argument.
             currentrank < bestrank && makemethod(expr_fmerged, fexpress(mfpair), sig, symbol("$(mfpair[1])"))
 
-        end
+        end # for sig in fsigs
 
-    end
+    end # for mfpair in modufuncs
 
-end # Function merge!(fmerged::Function, modfuncA::(Module, Function), modfuncB::(Module, Function); conflicts_favor=Module)
+end # Function merge!(fmerged::Function, modufuncs::(Module, Function)...; priority=[])
 
 end # Module MetaMerge
